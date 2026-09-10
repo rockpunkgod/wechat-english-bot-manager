@@ -1,0 +1,7 @@
+{
+  "name": "wechat-english-bot-desktop-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Packaged iLink + Codex English tutoring engine"
+}
