@@ -1,0 +1,100 @@
+name: Build and publish Windows setup
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+          cache: npm
+      - name: Check tag and install locked dependencies
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag and application version differ.' }
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
+      - name: Build application and setup
+        shell: pwsh
+        run: |
+          $iscc = & ./scripts/Get-InnoSetup.ps1
+          & ./Build-Setup.ps1 -NodePath (Get-Command node).Source -IsccPath $iscc
+      - name: Test controller, bundle, UI and installation lifecycle
+        shell: pwsh
+        run: |
+          node --test tests/controller.test.mjs tests/bundle.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Node regression tests failed.' }
+          & ./Build-Setup.ps1 -SkipAppBuild -TestInstaller
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          & ./tests/Verify-Setup.ps1 -SetupPath (Join-Path $PWD "build/setup-test/WechatEnglishBotManager-TestSetup-$version-x64.exe") -TestRootParent $env:RUNNER_TEMP
+      - name: Prepare release assets and checksums
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          Copy-Item -LiteralPath 'release/微信英语Bot管理器-用量整合版.exe' -Destination "release/WechatEnglishBotManager-Portable-$version-x64.exe"
+          git archive --format=zip "--output=release/WechatEnglishBotManager-Source-$version.zip" HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Source archive failed.' }
+          Copy-Item -LiteralPath "docs/releases/v$version.md" -Destination 'release/RELEASE-NOTES.md'
+          $assets = Get-ChildItem release -File | Where-Object { $_.Name -like 'WechatEnglishBotManager-*' }
+          $assets | Sort-Object Name | ForEach-Object {
+            ((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name)
+          } | Set-Content -LiteralPath release/SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-release
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            release/WechatEnglishBotManager-*.exe
+            release/WechatEnglishBotManager-Source-*.zip
+            release/SHA256SUMS.txt
+            release/RELEASE-NOTES.md
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: windows-release
+          path: release
+      - name: Publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          cd release
+          sha256sum --check SHA256SUMS.txt
+          if existing=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$existing" != "true" ]; then
+              echo "A published release already exists; refusing to overwrite it."
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "微信英语 Bot 管理器 $RELEASE_TAG" --notes-file RELEASE-NOTES.md
+          fi
+          gh release upload "$RELEASE_TAG" WechatEnglishBotManager-* SHA256SUMS.txt --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest

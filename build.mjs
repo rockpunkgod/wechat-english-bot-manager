@@ -10,6 +10,8 @@ const deps = process.env.BOT_BUILD_DEPS || path.join(root, 'node_modules');
 const { build } = createRequire(import.meta.url)(path.join(deps, 'esbuild'));
 const nodeSource = process.env.BOT_NODE_SOURCE || process.execPath;
 const skillSource = process.env.BOT_SKILL_SOURCE || path.join(root, 'skills', 'gaokao-english');
+const version = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version;
+const nodeLicense = await readFile(process.env.BOT_NODE_LICENSE || path.join(path.dirname(nodeSource), 'LICENSE'));
 await mkdir(output, { recursive: true });
 const bundled = await build({
   absWorkingDir: root,
@@ -20,7 +22,7 @@ const bundled = await build({
   banner: { js: 'import { createRequire as __createRequire } from "node:module"; const require = __createRequire(import.meta.url);' },
 });
 await copyFile(nodeSource, path.join(output, 'node.exe'));
-await copyFile(path.join(path.dirname(nodeSource), 'LICENSE'), path.join(output, 'NODE-LICENSE.txt'));
+await writeFile(path.join(output, 'NODE-LICENSE.txt'), nodeLicense);
 await copyFile(path.join(root, 'engine', 'controller.mjs'), path.join(output, 'controller.mjs'));
 async function windowsPowerShell(source, target) {
   const script = (await readFile(source, 'utf8')).replace(/^\uFEFF/, '');
@@ -32,6 +34,9 @@ await mkdir(path.join(output, 'source'), { recursive: true });
 // Whitelist source files. No .env, login tokens, conversations, images or runtime backups are packaged.
 for (const name of ['Manager.cs', 'UiTheme.cs', 'UsageData.cs', 'UsagePanel.cs', 'app.manifest', 'build.mjs', 'Build.ps1', 'Export-Icon.ps1', 'package.json', 'README.md']) await copyFile(path.join(root, name), path.join(output, 'source', name));
 for (const name of ['Build.ps1', 'Export-Icon.ps1']) await windowsPowerShell(path.join(root, name), path.join(output, 'source', name));
+for (const name of ['Build-Setup.ps1', 'Publish-Release.ps1']) await windowsPowerShell(path.join(root, name), path.join(output, 'source', name));
+await copyFile(path.join(root, 'package-lock.json'), path.join(output, 'source', 'package-lock.json'));
+for (const name of ['installer', 'scripts', '.github', 'docs']) await cp(path.join(root, name), path.join(output, 'source', name), { recursive: true });
 await cp(path.join(root, 'assets'), path.join(output, 'source', 'assets'), { recursive: true });
 await cp(path.join(root, 'engine'), path.join(output, 'source', 'engine'), { recursive: true });
 for (const name of ['legacy-handoff.ps1', 'handoff-policy.ps1']) await windowsPowerShell(path.join(root, 'engine', name), path.join(output, 'source', 'engine', name));
@@ -52,5 +57,5 @@ for (const [name, packageDir] of packages) {
   }
 }
 const skill = await readFile(path.join(skillSource, 'SKILL.md'));
-await writeFile(path.join(output, 'build-info.json'), JSON.stringify({ version: '1.1.0', builtAt: new Date().toISOString(), node: process.version, skillSha256: createHash('sha256').update(skill).digest('hex'), dependencies: [...packages.keys()] }, null, 2));
+await writeFile(path.join(output, 'build-info.json'), JSON.stringify({ version, builtAt: new Date().toISOString(), node: process.version, skillSha256: createHash('sha256').update(skill).digest('hex'), dependencies: [...packages.keys()] }, null, 2));
 console.log(JSON.stringify({ ok: true, payload: output, dependencies: [...packages.keys()], skillSha256: createHash('sha256').update(skill).digest('hex') }));

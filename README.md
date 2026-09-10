@@ -1,6 +1,8 @@
 # 微信英语 Bot 管理器
 
-当前版本：1.1.0，用量整合与图标界面版。双击 `微信英语Bot管理器-用量整合版.exe` 使用。首次运行会在程序旁解压运行环境，并创建 `data` 管理配置目录。以后直接双击同一个程序即可。
+当前版本：1.1.1，新增 Windows x64 安装包。在 [Releases](https://github.com/rockpunkgod/wechat-english-bot-manager/releases) 下载 `WechatEnglishBotManager-Setup-1.1.1-x64.exe`，按向导安装并创建桌面快捷方式。也可直接使用便携版 `微信英语Bot管理器-用量整合版.exe`。首次启动会在程序旁解压运行环境，并创建 `data` 管理配置目录。
+
+安装包默认使用 `D:\bot\release`；没有 D 盘时使用当前用户程序目录。升级时请选择原目录。卸载只移除安装器登记的文件，保留账号、用量和运行缓存。安装包尚未配置代码签名证书，可用发布附件中的 SHA256SUMS.txt 核对文件。
 
 升级时，把新 EXE 放到原管理器旁边，与原 `data` 文件夹同级，继续使用同一份管理列表。不要覆盖或删除 `data`，也不要把测试目录当成正式数据。原程序可以保留备份。关闭旧管理器窗口通常只是隐藏到托盘；同一目录不允许两个管理器同时运行。
 
@@ -62,3 +64,11 @@
 `Build.ps1` 在编译之前运行 Windows PowerShell 5.1 的脚本解析、中文备份往返、精确匹配、备份失败/部分失败恢复等模拟回归测试。测试替换全部任务与进程查询/控制操作，不操作真实计划任务。控制器测试使用本机假 Bot，不连接真实微信或请求 Codex。
 
 打包采用文件白名单，排除 `.env`、微信令牌、聊天记录、图片、日志以及复制留下的运行备份。运行程序本身不产生模型请求，学生题目触发 Codex 时才使用模型额度。
+
+## 安装包与 GitHub Release
+
+构建依赖由 `package-lock.json` 锁定。运行 `npm ci`，再运行 `scripts/Get-InnoSetup.ps1` 准备已固定 SHA-256 且验证发行者签名的 Inno Setup 6.7.3 编译器，随后执行 `Build-Setup.ps1`。也可通过 `-IsccPath` 指定编译器。Node 精简分发版若不带相邻 LICENSE 文件，需以 `-NodeLicensePath` 指定对应版本的许可证。
+
+运行 `Build-Setup.ps1 -SkipAppBuild -TestInstaller` 后，将生成的测试安装包传给 `tests/Verify-Setup.ps1 -SetupPath <完整路径>`，核验首次安装、覆盖升级和卸载。测试使用独立目录、测试安装标识，不创建桌面快捷方式或卸载注册表项，也不启动真实 Bot。
+
+发布前更新 `package.json` 和 `docs/releases/v<版本>.md`，提交源码，然后在已登录 GitHub 的 Windows 账户下执行 `Publish-Release.ps1`。它用 Git 原子推送 main 与版本标签，不强推、不覆盖已有不同版本标签。GitHub Actions 在测试通过后发布 Setup、便携版、源码 ZIP 和 SHA256SUMS.txt；可在仓库 Actions 页面检查执行结果。安装包保存在 Release 附件中，不作为二进制文件提交进 Git 历史。

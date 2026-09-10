@@ -1,8 +1,9 @@
-﻿param([string]$NodePath = 'node', [string]$DependenciesPath = '', [string]$SkillPath = '', [string]$ProgramName = '微信英语Bot管理器.exe')
+﻿param([string]$NodePath = 'node', [string]$DependenciesPath = '', [string]$SkillPath = '', [string]$ProgramName = '微信英语Bot管理器.exe', [string]$NodeLicensePath = '')
 $ErrorActionPreference = 'Stop'
 $botSourceRoot = $PSScriptRoot
 if ($DependenciesPath) { $env:BOT_BUILD_DEPS = $DependenciesPath }
 if ($SkillPath) { $env:BOT_SKILL_SOURCE = $SkillPath }
+if ($NodeLicensePath) { $env:BOT_NODE_LICENSE = $NodeLicensePath }
 $nodeCommand = Get-Command $NodePath -ErrorAction Stop
 $env:BOT_NODE_SOURCE = $nodeCommand.Source
 Push-Location $botSourceRoot
@@ -22,7 +23,12 @@ try {
     if ([IO.Path]::GetFileName($ProgramName) -ne $ProgramName -or [IO.Path]::GetExtension($ProgramName) -ne '.exe') { throw '输出名称必须是当前发布目录中的 EXE 文件名。' }
     $programPath = Join-Path $releasePath $ProgramName
     $programIcon = Join-Path $botSourceRoot 'assets\bot-manager-v1.ico'
+    $version = (Get-Content -LiteralPath (Join-Path $botSourceRoot 'package.json') -Raw | ConvertFrom-Json).version
+    if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version.' }
+    $versionSource = Join-Path $botSourceRoot 'build\AssemblyInfo.g.cs'
+    [IO.File]::WriteAllText($versionSource, ('using System.Reflection; [assembly: AssemblyTitle("Wechat English Bot Manager")] [assembly: AssemblyVersion("' + $version + '.0")] [assembly: AssemblyFileVersion("' + $version + '.0")]'), [Text.UTF8Encoding]::new($false))
     $csharpFiles = @('Manager.cs', 'UiTheme.cs', 'UsageData.cs', 'UsagePanel.cs', 'tests\UsageTests.cs', 'tests\HandoffTests.cs') | ForEach-Object { Join-Path $botSourceRoot $_ }
+    $csharpFiles += $versionSource
     & $compilerPath /nologo /target:winexe /platform:x64 /optimize+ /codepage:65001 "/win32icon:$programIcon" "/win32manifest:$botSourceRoot\app.manifest" "/out:$programPath" "/resource:$zipPath,engine.zip" /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll $csharpFiles
     if ($LASTEXITCODE -ne 0) { throw 'Windows 程序编译失败。' }
     Get-Item -LiteralPath $programPath | Select-Object FullName,Length,LastWriteTime
