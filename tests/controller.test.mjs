@@ -17,11 +17,15 @@ function request(s, route = '/status', method = 'GET', body, token = s.token) {
 }
 test('controller: state isolation, authentication, pairing, single instance, crash recovery and stop', async (t) => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'wechat-desktop-controller-test-'));
-  const base = { id: 'test-a', stateDir: path.join(root, 'a'), workspace: root, port: 0, entry, restartDelayMs: 50, env: { NEED_PAIR: '1' } };
+  const base = { id: 'test-a', launchId: 'launch-attempt-a', stateDir: path.join(root, 'a'), workspace: root, port: 0, entry, restartDelayMs: 50, env: { NEED_PAIR: '1' } };
   const a = await startSupervisor(base);
   let b;
   try {
     await eventually(async () => (await (await request(a)).json()).connection.phase === 'awaiting-pair');
+    await t.test('control file and authenticated status identify the owning launch attempt', async () => {
+      assert.equal(JSON.parse(readFileSync(path.join(base.stateDir, 'desktop-control.json'), 'utf8')).launchId, base.launchId);
+      assert.equal((await (await request(a)).json()).launchId, base.launchId);
+    });
     await t.test('unauthenticated requests cannot stop a Bot', async () => {
       assert.equal((await request(a, '/stop', 'POST', '', 'wrong')).status, 401);
       assert.equal((await request(a)).status, 200);

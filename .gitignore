@@ -1,0 +1,39 @@
+# Generated packages and QA output are not source code.
+/build/
+/qa/
+/release/
+**/node_modules/
+/data/
+/program-files/
+/程序文件/
+
+# Never commit live account state, conversations, images or credentials.
+**/.runtime/
+**/.env
+**/.env.*
+**/desktop-launch.json
+**/desktop-control.json
+**/desktop-handoff.json
+**/manager.json
+**/ilink-account.json
+**/ilink-sync.txt
+**/threads.json
+**/pending-batches.json
+**/usage.json
+**/usd-cny-rate.json
+**/pairing-code.txt
+**/wechat-login-qr.png
+**/handoff-backups/
+**/login-backups/
+*.log
+*.previous
+*.tmp
+*.exe
+*.zip
+
+# Workstation/editor state.
+.vs/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini

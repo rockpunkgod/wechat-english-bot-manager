@@ -31,9 +31,17 @@ test('standalone bundle creates PNG login QR and reports actual login phase usin
   child.stdout.on('data', (chunk) => { output += chunk; });
   try {
     const qr = path.join(root, 'wechat-login-qr.png');
-    for (let i = 0; i < 80 && !existsSync(qr); i++) await new Promise((resolve) => setTimeout(resolve, 100));
-    assert.equal(existsSync(qr), true, output);
-    assert.equal(readFileSync(qr).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+    let png;
+    for (let i = 0; i < 80; i++) {
+      try {
+        const candidate = readFileSync(qr);
+        // File creation precedes the PNG encoder finishing its stream. Wait for IEND,
+        // not merely path existence, so this test cannot race an in-progress write.
+        if (candidate.length >= 20 && candidate.subarray(0, 8).toString('hex') === '89504e470d0a1a0a' && candidate.subarray(-8, -4).toString('ascii') === 'IEND') { png = candidate; break; }
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(png, 'Complete local QR PNG was not ready: ' + output);
     const health = await (await fetch('http://127.0.0.1:' + port + '/health')).json();
     assert.equal(health.ok, true); assert.equal(health.botId, 'bundle-test');
     assert.equal(health.connection.phase, 'awaiting-scan');

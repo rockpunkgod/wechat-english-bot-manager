@@ -94,7 +94,7 @@ export async function startSupervisor(options) {
     const respond = (code, data) => { response.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Connection': 'close' }); response.end(JSON.stringify(data)); };
     if (request.headers.authorization !== 'Bearer ' + token) { respond(401, { error: 'Unauthorized' }); return; }
     if (request.method === 'GET' && request.url === '/status') {
-      respond(200, { kind: 'wechat-bot-desktop', id: options.id, pid: process.pid, childPid: child?.pid ?? null, startedAt, restarts, stopping, connection: readStatus() });
+      respond(200, { kind: 'wechat-bot-desktop', id: options.id, launchId: options.launchId ?? null, pid: process.pid, childPid: child?.pid ?? null, startedAt, restarts, stopping, connection: readStatus() });
     } else if (request.method === 'POST' && request.url === '/stop') {
       respond(200, { ok: true }); setTimeout(() => { void stop(); }, 30);
     } else if (request.method === 'POST' && request.url === '/pair') {
@@ -123,7 +123,7 @@ export async function startSupervisor(options) {
       }
     } catch (error) { if (!(error instanceof SyntaxError)) { server.close(); throw error; } }
   }
-  writeFileSync(controlPath, JSON.stringify({ token, pid: process.pid, port: server.address().port, id: options.id, startedAt }), { mode: 0o600 });
+  writeFileSync(controlPath, JSON.stringify({ token, pid: process.pid, port: server.address().port, id: options.id, launchId: options.launchId ?? null, startedAt }), { mode: 0o600 });
   launch();
   return { stop, port: server.address().port, token, get childPid() { return child?.pid; } };
 }

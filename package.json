@@ -1,6 +1,6 @@
 {
   "name": "wechat-english-bot-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": { "bundle": "node build.mjs", "test": "node --test tests/controller.test.mjs" },

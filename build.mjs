@@ -21,12 +21,20 @@ const bundled = await build({
 });
 await copyFile(nodeSource, path.join(output, 'node.exe'));
 await copyFile(path.join(path.dirname(nodeSource), 'LICENSE'), path.join(output, 'NODE-LICENSE.txt'));
-for (const name of ['controller.mjs', 'legacy-handoff.ps1']) await copyFile(path.join(root, 'engine', name), path.join(output, name));
+await copyFile(path.join(root, 'engine', 'controller.mjs'), path.join(output, 'controller.mjs'));
+async function windowsPowerShell(source, target) {
+  const script = (await readFile(source, 'utf8')).replace(/^\uFEFF/, '');
+  await writeFile(target, '\uFEFF' + script, 'utf8');
+}
+for (const name of ['legacy-handoff.ps1', 'handoff-policy.ps1']) await windowsPowerShell(path.join(root, 'engine', name), path.join(output, name));
 await cp(skillSource, path.join(output, 'skills', 'gaokao-english'), { recursive: true, dereference: true });
 await mkdir(path.join(output, 'source'), { recursive: true });
 // Whitelist source files. No .env, login tokens, conversations, images or runtime backups are packaged.
-for (const name of ['Manager.cs', 'app.manifest', 'build.mjs', 'Build.ps1', 'package.json', 'README.md']) await copyFile(path.join(root, name), path.join(output, 'source', name));
+for (const name of ['Manager.cs', 'UiTheme.cs', 'UsageData.cs', 'UsagePanel.cs', 'app.manifest', 'build.mjs', 'Build.ps1', 'Export-Icon.ps1', 'package.json', 'README.md']) await copyFile(path.join(root, name), path.join(output, 'source', name));
+for (const name of ['Build.ps1', 'Export-Icon.ps1']) await windowsPowerShell(path.join(root, name), path.join(output, 'source', name));
+await cp(path.join(root, 'assets'), path.join(output, 'source', 'assets'), { recursive: true });
 await cp(path.join(root, 'engine'), path.join(output, 'source', 'engine'), { recursive: true });
+for (const name of ['legacy-handoff.ps1', 'handoff-policy.ps1']) await windowsPowerShell(path.join(root, 'engine', name), path.join(output, 'source', 'engine', name));
 await cp(path.join(root, 'tests'), path.join(output, 'source', 'tests'), { recursive: true });
 await cp(skillSource, path.join(output, 'source', 'skills', 'gaokao-english'), { recursive: true, dereference: true });
 await mkdir(path.join(output, 'licenses'), { recursive: true });
@@ -44,5 +52,5 @@ for (const [name, packageDir] of packages) {
   }
 }
 const skill = await readFile(path.join(skillSource, 'SKILL.md'));
-await writeFile(path.join(output, 'build-info.json'), JSON.stringify({ version: '1.0.0', builtAt: new Date().toISOString(), node: process.version, skillSha256: createHash('sha256').update(skill).digest('hex'), dependencies: [...packages.keys()] }, null, 2));
+await writeFile(path.join(output, 'build-info.json'), JSON.stringify({ version: '1.1.0', builtAt: new Date().toISOString(), node: process.version, skillSha256: createHash('sha256').update(skill).digest('hex'), dependencies: [...packages.keys()] }, null, 2));
 console.log(JSON.stringify({ ok: true, payload: output, dependencies: [...packages.keys()], skillSha256: createHash('sha256').update(skill).digest('hex') }));
